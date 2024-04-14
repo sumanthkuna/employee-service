@@ -2,16 +2,15 @@ package com.employeemanagement.employeeservice.service;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
 import com.employeemanagement.employeeservice.dto.APIResponseDto;
 import com.employeemanagement.employeeservice.dto.DepartmentDto;
 import com.employeemanagement.employeeservice.dto.EmployeeDto;
 import com.employeemanagement.employeeservice.entity.Employee;
 import com.employeemanagement.employeeservice.exception.ResourceNotFoundException;
 import com.employeemanagement.employeeservice.repository.EmployeeRepository;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 
 @Service
@@ -39,6 +38,7 @@ public class EmployeeServiceImpl implements EmployeeService{
 	}
 
 	@Override
+	@CircuitBreaker(name ="${spring.application.name}", fallbackMethod = "fallbackMethod")
 	public APIResponseDto getEmployeeById(Long id) {
 		
 		Employee employeeWithGivenId = employeeRepository.findById(id).orElseThrow(
@@ -61,5 +61,27 @@ public class EmployeeServiceImpl implements EmployeeService{
 		
 		return apiResponseDto;
 	}
+	
+	
+	public APIResponseDto fallbackMethod(Long id,Exception e) {
+		
+		Employee employeeWithGivenId = employeeRepository.findById(id).orElseThrow(
+				()->new ResourceNotFoundException("Employee", "id", id)
+				);
+		ModelMapper modelMapper = new ModelMapper();
+		EmployeeDto employeeWithGivenIdDto = modelMapper.map(employeeWithGivenId,EmployeeDto.class);
+		
+		//setting dummy department dto
+		DepartmentDto departmentDto = new DepartmentDto();
+		departmentDto.setDepartmentCode("RD001");
+		departmentDto.setDepartmentName("R & D");
+		departmentDto.setDepartmentDescription("Research and Development");
+		
+		APIResponseDto apiResponseDto = new APIResponseDto();
+		apiResponseDto.setEmployeeDto(employeeWithGivenIdDto);
+		apiResponseDto.setDepartmentDto(departmentDto);
+		
+		return apiResponseDto;
+    }
 
 }
